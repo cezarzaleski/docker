@@ -1,0 +1,101 @@
+version: '2'
+
+services:
+  nginx-proxy:
+    image: nginx
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - nginx-conf:/etc/nginx/conf.d
+      - nginx-vhost:/etc/nginx/vhost.d
+      - nginx-html:/usr/share/nginx/html
+      - ./ssl:/etc/nginx/certs:ro
+    labels:
+      com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy: "true"
+
+  nginx-gen:
+    image: jwilder/docker-gen
+    container_name: nginx-gen
+    command: -notify-sighup nginx -wait 5s:30s -watch /etc/docker-gen/templates/nginx.tmpl /etc/nginx/conf.d/default.conf
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./nginx.tmpl:/etc/docker-gen/templates/nginx.tmpl
+      - nginx-conf:/etc/nginx/conf.d
+      - nginx-vhost:/etc/nginx/vhost.d
+      - nginx-html:/usr/share/nginx/html
+      - ./ssl:/etc/nginx/certs:ro
+    links:
+      - nginx-proxy
+
+  nginx-letsencrypt:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    container_name: nginx-letsencrypt
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - nginx-conf:/etc/nginx/conf.d
+      - nginx-vhost:/etc/nginx/vhost.d
+      - nginx-html:/usr/share/nginx/html
+      - ./ssl:/etc/nginx/certs:rw
+    environment:
+      NGINX_DOCKER_GEN_CONTAINER: nginx-gen
+      ACME_CA_URI: https://acme-staging.api.letsencrypt.org/directory
+      LETSENCRYPT_ACCOUNT_ALIAS: apimm
+      LETSENCRYPT_TEST: "true"
+    links:
+      - nginx-proxy
+
+  api:
+    image: nginx:1.14.0
+    ports:
+      - "8080:80"
+    volumes:
+        - "../../:/code"
+        - "./site.conf:/etc/nginx/conf.d/default.conf"
+    environment:
+      - VIRTUAL_HOST=api-mm.mbamobi.com.br,www.api-mm.mbamobi.com.br
+      - LETSENCRYPT_HOST=api-mm.mbamobi.com.br,www.api-mm.mbamobi.com.br
+      - LETSENCRYPT_EMAIL=paulo.borges@mbamobi.com.br
+    links:
+        - php
+        - pgsql
+        - gearmand
+    network_mode: "bridge"
+  php:
+    build:
+      context: ../php
+    network_mode: "bridge"
+    volumes:
+        - ../../:/code
+  pgsql:
+    image: sameersbn/postgresql:9.6-2
+    ports:
+      - "5432:5432"
+    environment:
+      - DEBUG=false
+
+      - DB_USER=db_mobile
+      - DB_PASS=Mb4123
+      - DB_NAME=db_mobile
+      - DB_TEMPLATE=
+
+      - DB_EXTENSION=
+
+      - REPLICATION_MODE=
+      - REPLICATION_USER=
+      - REPLICATION_PASS=
+      - REPLICATION_SSLMODE=
+    network_mode: "bridge"
+  gearmand:
+      image: bidibi/gearman-server
+      network_mode: "bridge"
+      ports:
+        - "5730:5730"
+        - "4730:4730"
+      volumes:
+          -  ./logs/gearmand:/var/log/
+volumes:
+  nginx-conf:
+  nginx-vhost:
+  nginx-html:
