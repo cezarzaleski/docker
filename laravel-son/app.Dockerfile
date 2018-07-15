@@ -1,10 +1,3 @@
-FROM nginx:1.10-alpine
-
-ADD default.conf /etc/nginx/conf.d/default.conf
-
-COPY public /var/www/public
-
-root@allan-kardec:~/projetos/forum-realtime-com-laravel# cat app.Dockerfile
 FROM shakyshane/laravel-php:latest
 
 COPY composer.lock composer.json /var/www/

@@ -14,7 +14,7 @@ services:
       - "MYSQL_PORT=3306"
  #the app
   app:
-    image: cezarzaleski/laravelapp:v1
+    image: cezarzaleski/php-ftp-5.6
     working_dir: /var/www
     volumes:
       - /var/www/storage
